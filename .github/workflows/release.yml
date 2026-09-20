@@ -1,0 +1,33 @@
+name: Release
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [module.json]
+permissions:
+  contents: write
+concurrency:
+  group: simple-pings-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm test
+      - run: npm run build
+      - name: Publish a new version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          version=$(node -p "JSON.parse(require('fs').readFileSync('module.json','utf8')).version")
+          tag="v${version}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; leaving it unchanged."
+            exit 0
+          fi
+          gh release create "$tag" "dist/module.json" "dist/simple-pings-v${version}.zip" --target "$GITHUB_SHA" --title "Simple Pings ${version}" --notes-file RELEASE_NOTES.md
